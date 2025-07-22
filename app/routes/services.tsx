@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLoaderData } from "react-router";
 import { ItemCard, type Item } from "../components/ItemCard";
-import { getAllItems } from "../data/items";
+import { getAllItems } from "../data/jsonDataManager";
 
 // Loader function required by React Router v7
 export async function loader() {

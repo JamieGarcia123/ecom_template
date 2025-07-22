@@ -124,7 +124,6 @@ export default function ProviderDashboard() {
               <div key={item.id} className="relative">
                 <ItemCard
                   item={item}
-                  onAddToCart={() => {}} // Disable for provider view
                 />
                 {/* Edit Button Overlay */}
                 <div className="absolute top-2 right-2">

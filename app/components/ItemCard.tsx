@@ -65,18 +65,18 @@ export function ItemCard({
         {/* Action Buttons */}
         <div className="flex space-x-2">
           <Link 
-            to={`/services/${item.id}`}
+            to={`/service/${item.id}`}
             className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-center py-2 px-4 rounded-md text-sm font-medium transition-colors"
           >
             View Details
           </Link>
           
-          <button 
+          {/* <button 
             onClick={handleAddToCart}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium transition-colors"
           >
             Add to Cart
-          </button>
+          </button> */}
         </div>
       </div>
     </div>
