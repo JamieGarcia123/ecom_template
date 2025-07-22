@@ -13,24 +13,12 @@ export interface Item {
 
 interface ItemCardProps {
   item: Item;
-  onAddToCart?: (item: Item) => void;
-  onToggleFavorite?: (item: Item) => void;
-  isFavorite?: boolean;
+
 }
 
 export function ItemCard({ 
   item, 
-  onAddToCart, 
-  onToggleFavorite, 
-  isFavorite = false 
 }: ItemCardProps) {
-  const handleAddToCart = () => {
-    onAddToCart?.(item);
-  };
-
-  const handleToggleFavorite = () => {
-    onToggleFavorite?.(item);
-  };
 
   return (
     <div className="bg-white shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300">

@@ -99,8 +99,18 @@ class JSONDataManager {
       active: true
     };
     
+    console.log('addService - adding new service:', newService.name, 'with ID:', newService.id);
+    console.log('addService - current services count before add:', this.services.length);
+    
     this.services.push(newService);
+    console.log('addService - services count after add:', this.services.length);
+    
     this.saveToLocalStorage();
+    
+    // Immediately reload from localStorage to ensure consistency
+    this.loadFromLocalStorage();
+    
+    console.log('addService - final services count after localStorage reload:', this.services.length);
     return newService;
   }
 
@@ -150,7 +160,14 @@ class JSONDataManager {
   private saveToLocalStorage(): void {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('services_data', JSON.stringify(this.services));
+        // Only save services that are NOT in the original JSON (i.e., newly added ones)
+        const originalIds = [1, 2, 3, 4, 5, 6, 7]; // IDs from original JSON
+        const newServices = this.services.filter(service => !originalIds.includes(service.id));
+        
+        console.log('saveToLocalStorage - saving', newServices.length, 'new services to localStorage');
+        console.log('saveToLocalStorage - new services:', newServices.map(s => ({ id: s.id, name: s.name })));
+        
+        localStorage.setItem('services_data', JSON.stringify(newServices));
         console.log('Services saved to localStorage');
       } catch (error) {
         console.error('Error saving to localStorage:', error);
@@ -164,16 +181,24 @@ class JSONDataManager {
         const saved = localStorage.getItem('services_data');
         if (saved) {
           const savedServices = JSON.parse(saved);
+          console.log('loadFromLocalStorage - found', savedServices.length, 'services in localStorage');
+          console.log('loadFromLocalStorage - current services count before merge:', this.services.length);
+          
           // Merge with original data, preferring localStorage for existing services
           savedServices.forEach((savedService: ServiceItem) => {
             const index = this.services.findIndex(s => s.id === savedService.id);
             if (index >= 0) {
+              console.log('loadFromLocalStorage - updating existing service:', savedService.name);
               this.services[index] = savedService;
             } else {
+              console.log('loadFromLocalStorage - adding new service:', savedService.name);
               this.services.push(savedService);
             }
           });
+          console.log('loadFromLocalStorage - services count after merge:', this.services.length);
           console.log('Services loaded from localStorage');
+        } else {
+          console.log('loadFromLocalStorage - no localStorage data found');
         }
       } catch (error) {
         console.error('Error loading from localStorage:', error);
@@ -209,8 +234,17 @@ async function ensureInitialized(): Promise<void> {
 
 // Export functions (backwards compatible with existing code)
 export function getAllItems(): Item[] {
-  // For now, return the data synchronously using fallback data
-  // This ensures the services page works immediately
+  console.log('getAllItems called - initialized:', jsonDataManager['initialized']);
+  console.log('getAllItems called - services length:', jsonDataManager.getAllServices().length);
+  
+  // Return services from the data manager if initialized, otherwise return fallback data
+  if (jsonDataManager.getAllServices().length > 0) {
+    console.log('Returning data from manager:', jsonDataManager.getAllServices().length, 'services');
+    return jsonDataManager.getAllServices();
+  }
+  
+  console.log('Returning fallback data');
+  // Fallback data for immediate synchronous access
   return [
     {
       id: 1,
@@ -271,8 +305,26 @@ export async function getItemById(id: number): Promise<Item | undefined> {
 
 // Async versions for future use
 export async function getAllItemsAsync(): Promise<Item[]> {
+  console.log('getAllItemsAsync called - starting initialization...');
   await ensureInitialized();
-  return jsonDataManager.getAllServices();
+  console.log('getAllItemsAsync - after initialization, services:', jsonDataManager.getAllServices().length);
+  
+  // Check localStorage directly for debugging
+  if (typeof window !== 'undefined') {
+    const localStorageData = localStorage.getItem('services_data');
+    if (localStorageData) {
+      const parsed = JSON.parse(localStorageData);
+      console.log('getAllItemsAsync - localStorage contains:', parsed.length, 'services');
+      console.log('getAllItemsAsync - localStorage services:', parsed.map((s: any) => ({ id: s.id, name: s.name })));
+    } else {
+      console.log('getAllItemsAsync - no localStorage data found');
+    }
+  }
+  
+  const services = jsonDataManager.getAllServices();
+  console.log('getAllItemsAsync returning:', services.length, 'services');
+  console.log('getAllItemsAsync returning:', services.map(s => ({ id: s.id, name: s.name })));
+  return services;
 }
 
 export async function getItemByIdAsync(id: number): Promise<Item | undefined> {
@@ -303,17 +355,32 @@ export async function getAllProviders(): Promise<Provider[]> {
 // Provider dashboard functions
 export async function addNewService(service: Omit<ServiceItem, 'id'>): Promise<ServiceItem> {
   await ensureInitialized();
-  return jsonDataManager.addService(service);
+  const newService = jsonDataManager.addService(service);
+  
+  // Force reload localStorage to ensure data is merged properly
+  jsonDataManager.loadFromLocalStorage();
+  
+  return newService;
 }
 
 export async function updateExistingService(id: number, updates: Partial<ServiceItem>): Promise<ServiceItem | null> {
   await ensureInitialized();
-  return jsonDataManager.updateService(id, updates);
+  const result = jsonDataManager.updateService(id, updates);
+  
+  // Force reload localStorage to ensure data is merged properly
+  jsonDataManager.loadFromLocalStorage();
+  
+  return result;
 }
 
 export async function deleteExistingService(id: number): Promise<boolean> {
   await ensureInitialized();
-  return jsonDataManager.deleteService(id);
+  const result = jsonDataManager.deleteService(id);
+  
+  // Force reload localStorage to ensure data is merged properly
+  jsonDataManager.loadFromLocalStorage();
+  
+  return result;
 }
 
 // Utility functions

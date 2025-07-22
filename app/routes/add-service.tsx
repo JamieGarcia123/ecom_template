@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Form, useActionData, useLoaderData, useNavigation } from "react-router";
+import { Form, useActionData, useLoaderData, useNavigation, redirect } from "react-router";
 import { addNewService, getAllCategories, getAllProviders, type ServiceItem, type Category, type Provider } from "../data/jsonDataManager";
 
 // Loader function
@@ -13,23 +13,55 @@ export async function loader() {
 
 // Action function to handle form submission
 export async function action({ request }: { request: Request }) {
+  console.log('=== ADD SERVICE ACTION CALLED ===');
   const formData = await request.formData();
   
-  const serviceData: Omit<ServiceItem, 'id'> = {
-    name: formData.get("name") as string,
-    description: formData.get("description") as string,
-    price: parseFloat(formData.get("price") as string),
-    image: formData.get("image") as string || undefined,
-    category: formData.get("category") as string,
-    provider: formData.get("provider") as string,
-    duration: formData.get("duration") as string,
-    active: true
-  };
-
   try {
-    const newService = await addNewService(serviceData);
-    return { success: true, service: newService };
+    console.log('Form data:', Object.fromEntries(formData));
+    
+    // Process the service data directly here instead of calling another API
+    const serviceData = {
+      name: formData.get('name') as string,
+      description: formData.get('description') as string,
+      price: parseFloat(formData.get('price') as string),
+      category: formData.get('category') as string,
+      provider: formData.get('provider') as string,
+      duration: formData.get('duration') as string,
+      image: formData.get('image') as string || '/images/default-service.jpg'
+    };
+
+    console.log('Parsed service data:', serviceData);
+
+    // Read current services from file system
+    const fs = await import('fs');
+    const path = await import('path');
+    
+    const servicesPath = path.join(process.cwd(), 'public', 'data', 'services.json');
+    console.log('Reading from:', servicesPath);
+    
+    const currentData = fs.readFileSync(servicesPath, 'utf8');
+    const services = JSON.parse(currentData);
+    console.log('Current services count:', services.length);
+
+    // Add new service with next available ID
+    const newService = {
+      ...serviceData,
+      id: Math.max(...services.map((s: any) => s.id), 0) + 1,
+      active: true
+    };
+
+    console.log('New service to add:', newService);
+
+    services.push(newService);
+
+    // Write back to file
+    fs.writeFileSync(servicesPath, JSON.stringify(services, null, 2));
+    console.log('Service added successfully. Total services now:', services.length);
+
+    // Redirect to provider dashboard with success message
+    return redirect("/provider-dashboard?success=true&serviceName=" + encodeURIComponent(newService.name));
   } catch (error) {
+    console.error('Error adding service:', error);
     return { error: "Failed to add service. Please try again." };
   }
 }
@@ -40,16 +72,6 @@ export default function AddService() {
   const navigation = useNavigation();
   
   const isSubmitting = navigation.state === "submitting";
-
-  // Reset form on successful submission
-  useEffect(() => {
-    if (actionData?.success) {
-      // Form will be reset by navigation, but we could show a success message
-      setTimeout(() => {
-        alert(`Service "${actionData.service.name}" added successfully!`);
-      }, 100);
-    }
-  }, [actionData]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -68,15 +90,6 @@ export default function AddService() {
               <div className="rounded-md bg-red-50 p-4">
                 <div className="text-sm text-red-700">
                   {actionData.error}
-                </div>
-              </div>
-            )}
-
-            {/* Success Message */}
-            {actionData?.success && (
-              <div className="rounded-md bg-green-50 p-4">
-                <div className="text-sm text-green-700">
-                  Service added successfully!
                 </div>
               </div>
             )}

@@ -1,20 +1,92 @@
 import { useState, useEffect } from "react";
 import { useLoaderData } from "react-router";
 import { ItemCard, type Item } from "../components/ItemCard";
-import { getAllItems } from "../data/jsonDataManager";
+import { getAllItemsAsync } from "../data/jsonDataManager";
 
 // Loader function required by React Router v7
 export async function loader() {
-  const items = await getAllItems();
-  return { items };
+  console.log('Services loader called');
+  
+  try {
+    // Always load directly from file system
+    const fs = await import('fs');
+    const path = await import('path');
+    const filePath = path.join(process.cwd(), 'public', 'data', 'services.json');
+    const data = fs.readFileSync(filePath, 'utf8');
+    const services = JSON.parse(data);
+    console.log('Services loader - loaded from file:', services.length, 'services');
+    return { items: services };
+  } catch (error) {
+    console.error('Services loader error:', error);
+    // Fallback data if loading fails
+    const fallbackData = [
+      {
+        id: 1,
+        name: "Reiki Healing",
+        description: "One-on-one energy healing session with certified practitioners. Restore balance and promote natural healing through gentle touch therapy.",
+        price: 75.00,
+        image: "/images/reiki-healing.jpg"
+      },
+      {
+        id: 2,
+        name: "Nutrition Consultation", 
+        description: "Professional dietary guidance and meal planning. Work with certified nutritionists to improve your health and wellness.",
+        price: 120.00,
+        image: "/images/nutritional-guidance.jpg"
+      },
+      {
+        id: 3,
+        name: "Massage Therapy",
+        description: "Relaxing therapeutic massage sessions. Reduce stress and muscle tension with our licensed massage therapists.",
+        price: 150.00,
+        image: "/images/massage-therapy.jpg"
+      }
+    ];
+    console.log('Services loader - using fallback data:', fallbackData.length, 'services');
+    return { items: fallbackData };
+  }
 }
 
 export function ServicesPage() {
-  const { items: allItems } = useLoaderData<typeof loader>();
+  const { items: initialItems } = useLoaderData<typeof loader>();
+  console.log('ServicesPage - received items:', initialItems?.length || 0);
+  console.log('ServicesPage - items data:', initialItems);
+  
+  const [allItems, setAllItems] = useState<Item[]>(initialItems);
   const [favorites, setFavorites] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [filteredItems, setFilteredItems] = useState<Item[]>(allItems);
+
+  // Refresh services data to include localStorage on client-side
+  useEffect(() => {
+    async function refreshServices() {
+      try {
+        // Only refresh on client-side to get localStorage data
+        if (typeof window !== 'undefined') {
+          console.log('ServicesPage - refreshing to get localStorage data');
+          
+          // Check what's in localStorage directly
+          const localStorageData = localStorage.getItem('services_data');
+          console.log('ServicesPage - localStorage raw data:', localStorageData);
+          if (localStorageData) {
+            const parsed = JSON.parse(localStorageData);
+            console.log('ServicesPage - localStorage parsed data:', parsed);
+            console.log('ServicesPage - localStorage data length:', parsed.length);
+          }
+          
+          const updatedItems = await getAllItemsAsync();
+          console.log('ServicesPage - updated items from getAllItemsAsync:', updatedItems.length);
+          console.log('ServicesPage - updated items details:', updatedItems.map(item => ({ id: item.id, name: item.name })));
+          setAllItems(updatedItems);
+        }
+      } catch (error) {
+        console.error('Error refreshing services:', error);
+      }
+    }
+    
+    refreshServices();
+  }, []);
 
   // Get unique categories from items
   const categories = Array.from(new Set(allItems.map((item: any) => item.category).filter(Boolean)));
@@ -103,7 +175,7 @@ export function ServicesPage() {
             </div>
 
             {/* Category Filter */}
-            <div className="w-full lg:w-auto">
+            {/* <div className="w-full lg:w-auto">
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
@@ -116,7 +188,7 @@ export function ServicesPage() {
                   </option>
                 ))}
               </select>
-            </div>
+            </div> */}
 
             {/* Clear Filters Button */}
             {(searchQuery || selectedCategory !== "all") && (
@@ -161,9 +233,6 @@ export function ServicesPage() {
             <ItemCard
               key={item.id}
               item={item}
-              onAddToCart={handleBookService}
-              onToggleFavorite={handleToggleFavorite}
-              isFavorite={favorites.includes(item.id)}
             />
           ))}
         </div>
@@ -203,5 +272,4 @@ export function ServicesPage() {
   );
 }
 
-// Default export required by React Router v7
 export default ServicesPage;
