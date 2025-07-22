@@ -21,12 +21,12 @@ export function Header() {
               Home
             </Link>
             <Link 
-              to="/products" 
+              to="/services" 
               className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium"
             >
-              Products
+              Services
             </Link>
-            <Link 
+            {/* <Link 
               to="/about" 
               className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium"
             >
@@ -37,7 +37,7 @@ export function Header() {
               className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium"
             >
               Contact
-            </Link>
+            </Link> */}
           </nav>
 
           {/* User actions */}
@@ -46,7 +46,7 @@ export function Header() {
               to="/login" 
               className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium"
             >
-              Login
+              Provider Login
             </Link>
             <Link 
               to="/signup" 
