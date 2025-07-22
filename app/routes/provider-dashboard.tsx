@@ -1,12 +1,41 @@
     import { useState, useEffect } from "react";
 import { Link, redirect, useLoaderData } from "react-router";
 import { ItemCard, type Item } from "../components/ItemCard";
-import { getAllItems } from "../data/items";
 
-// Loader function - check if user is logged in
+// Function to load services data directly
+async function loadServicesData(): Promise<Item[]> {
+  try {
+    // For server-side rendering, we need to read the file directly
+    if (typeof window === 'undefined') {
+      // Server-side: read from file system
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      const filePath = path.join(process.cwd(), 'public', 'data', 'services.json');
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      const services = JSON.parse(fileContent);
+      
+      return services.filter((s: any) => s.active !== false);
+    } else {
+      // Client-side: fetch from URL
+      const response = await fetch('/data/services.json');
+      if (!response.ok) {
+        console.error('Failed to fetch services.json:', response.status);
+        return [];
+      }
+      
+      const services = await response.json();
+      return services.filter((s: any) => s.active !== false);
+    }
+  } catch (error) {
+    console.error('Error loading services data:', error);
+    return [];
+  }
+}
+
+// Loader function - load services data
 export async function loader() {
-  // We'll handle authentication check on the client side
-  const items = getAllItems();
+  const items = await loadServicesData();
   return { items, username: 'provider' };
 }
 

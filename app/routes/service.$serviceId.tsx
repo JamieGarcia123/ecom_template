@@ -1,18 +1,59 @@
 import { useState, useEffect } from "react";
-import { useLoaderData, useParams, Link } from "react-router";
-import { getItemById } from "../data/jsonDataManager";
+import { useLoaderData, Link } from "react-router";
 import type { Item } from "../components/ItemCard";
+
+// Simple function to load service data directly
+async function loadServiceData(id: number): Promise<Item | null> {
+  try {
+    // For server-side rendering, we need to read the file directly
+    if (typeof window === 'undefined') {
+      // Server-side: read from file system
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      const filePath = path.join(process.cwd(), 'public', 'data', 'services.json');
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      const services = JSON.parse(fileContent);
+      
+      const service = services.find((s: any) => s.id === id && s.active !== false);
+      return service || null;
+    } else {
+      // Client-side: fetch from URL
+      const response = await fetch('/data/services.json');
+      if (!response.ok) {
+        console.error('Failed to fetch services.json:', response.status);
+        return null;
+      }
+      
+      const services = await response.json();
+      const service = services.find((s: any) => s.id === id && s.active !== false);
+      return service || null;
+    }
+  } catch (error) {
+    console.error('Error loading service data:', error);
+    return null;
+  }
+}
 
 // Loader function to get service data
 export async function loader({ params }: { params: { serviceId: string } }) {
-  const serviceId = parseInt(params.serviceId);
-  const service = await getItemById(serviceId);
-  
-  if (!service) {
+  try {
+    const serviceId = parseInt(params.serviceId);
+    console.log('Loading service with ID:', serviceId);
+    
+    const service = await loadServiceData(serviceId);
+    console.log('Service found:', service);
+    
+    if (!service) {
+      console.log('Service not found for ID:', serviceId);
+      throw new Response("Service not found", { status: 404 });
+    }
+    
+    return { service };
+  } catch (error) {
+    console.error('Error in service loader:', error);
     throw new Response("Service not found", { status: 404 });
   }
-  
-  return { service };
 }
 
 export default function ServiceDetails() {
@@ -33,7 +74,7 @@ export default function ServiceDetails() {
 
   // Handle favorite toggle
   const handleToggleFavorite = () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && service) {
       const favorites = localStorage.getItem('serviceFavorites');
       const favList = favorites ? JSON.parse(favorites) : [];
       
@@ -56,8 +97,10 @@ export default function ServiceDetails() {
 
   const handleBookingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Booking request submitted for ${service.name}! You will be contacted soon.`);
-    setShowBookingForm(false);
+    if (service) {
+      alert(`Booking request submitted for ${service.name}! You will be contacted soon.`);
+      setShowBookingForm(false);
+    }
   };
 
   return (
