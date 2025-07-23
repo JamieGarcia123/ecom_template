@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Form, redirect, useActionData, useNavigation } from "react-router";
+import { redirect } from "react-router";
 
 // Hardcoded credentials for demo
 const DEMO_CREDENTIALS = {
@@ -7,44 +7,36 @@ const DEMO_CREDENTIALS = {
   password: "service2024"
 };
 
-// Loader function
-export async function loader() {
-  // Server-side rendering safe check
-  return {};
-}
-
-// Action function to handle form submission
-export async function action({ request }: { request: Request }) {
-  const formData = await request.formData();
-  const username = formData.get("username") as string;
-  const password = formData.get("password") as string;
-
-  // Validate credentials
-  if (username === DEMO_CREDENTIALS.username && password === DEMO_CREDENTIALS.password) {
-    // We'll handle localStorage on the client side
-    return {
-      success: true,
-      username
-    };
-  } else {
-    // Return error message
-    return {
-      error: "Invalid username or password. Please try again.",
-      username // Return username to keep it filled
-    };
-  }
-}
-
 export default function Login() {
-  const actionData = useActionData<typeof action>();
-  const navigation = useNavigation();
+  const [actionData, setActionData] = useState<{ success?: boolean; error?: string; username?: string } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
-  
-  const isSubmitting = navigation.state === "submitting";
+
+  // Handle form submission (client-side)
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    
+    const formData = new FormData(event.currentTarget);
+    const username = formData.get("username") as string;
+    const password = formData.get("password") as string;
+
+    // Validate credentials
+    if (username === DEMO_CREDENTIALS.username && password === DEMO_CREDENTIALS.password) {
+      setActionData({ success: true, username });
+    } else {
+      setActionData({ 
+        error: "Invalid username or password. Please try again.", 
+        username 
+      });
+    }
+    
+    setIsSubmitting(false);
+  };
 
   // Handle successful login on client side
   useEffect(() => {
-    if (actionData?.success) {
+    if (actionData?.success && actionData.username) {
       // Set login status in localStorage (client-side only)
       if (typeof window !== 'undefined') {
         localStorage.setItem('serviceProviderLoggedIn', 'true');
@@ -98,7 +90,7 @@ export default function Login() {
             )}
           </div>
 
-          <Form method="post" className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {/* Error Message */}
             {actionData?.error && (
               <div className="rounded-md bg-red-50 p-4">
@@ -153,7 +145,7 @@ export default function Login() {
                 {isSubmitting ? "Signing in..." : "Sign in"}
               </button>
             </div>
-          </Form>
+          </form>
 
           {/* Additional Info */}
           <div className="mt-6">

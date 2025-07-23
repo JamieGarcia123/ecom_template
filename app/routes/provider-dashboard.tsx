@@ -1,22 +1,21 @@
     import { useState, useEffect } from "react";
-import { Link, redirect, useLoaderData, useSearchParams, Form } from "react-router";
+import { Link, redirect, useSearchParams, Form } from "react-router";
 import { ItemCard, type Item } from "../components/ItemCard";
 import { getAllItemsAsync } from "../data/jsonDataManager";
 
-// Function to load services data directly (server-safe)
+// Function to load services data (browser-compatible)
 async function loadServicesData(): Promise<Item[]> {
   try {
     console.log('=== loadServicesData called ===');
     
-    // Always read directly from file system
-    const fs = await import('fs');
-    const path = await import('path');
+    // Use fetch for browser compatibility (SPA mode)
+    const response = await fetch('/ecom_template/data/services.json');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch services: ${response.status}`);
+    }
     
-    const filePath = path.join(process.cwd(), 'public', 'data', 'services.json');
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
-    const services = JSON.parse(fileContent);
-    
-    console.log('Loaded from file system:', services.length, 'services');
+    const services = await response.json();
+    console.log('Loaded from fetch:', services.length, 'services');
     return services.filter((s: any) => s.active !== false);
   } catch (error) {
     console.error('Error loading services data:', error);
@@ -75,80 +74,31 @@ async function loadServicesData(): Promise<Item[]> {
   }
 }
 
-export async function loader() {
-  console.log('=== LOADER STARTING ===');
-  const items = await loadServicesData();
-  console.log('=== LOADER COMPLETED ===');
-  console.log('Loader returning:', items.length, 'items');
-  console.log('Loader items:', items.map(i => ({ id: i.id, name: i.name })));
-  const result = { items, username: 'provider' };
-  console.log('Loader result:', result);
-  return result;
-}
-
-// Action function to handle delete requests
-export async function action({ request }: { request: Request }) {
-  const formData = await request.formData();
-  const intent = formData.get('intent') as string;
-  
-  if (intent === 'delete') {
-    const serviceId = parseInt(formData.get('serviceId') as string);
-    
-    try {
-      console.log('Deleting service with ID:', serviceId);
-      
-      // Read current services from file system
-      const fs = await import('fs');
-      const path = await import('path');
-      
-      const servicesPath = path.join(process.cwd(), 'public', 'data', 'services.json');
-      const currentData = fs.readFileSync(servicesPath, 'utf8');
-      const services = JSON.parse(currentData);
-      
-      // Find the service to get its name for the success message
-      const serviceToDelete = services.find((service: any) => service.id === serviceId);
-      
-      // Remove the service with the matching ID
-      const updatedServices = services.filter((service: any) => service.id !== serviceId);
-      
-      // Write back to file
-      fs.writeFileSync(servicesPath, JSON.stringify(updatedServices, null, 2));
-      
-      console.log('Service deleted successfully. Total services now:', updatedServices.length);
-      
-      // Redirect back with success message
-      return redirect(`/provider-dashboard?deleted=true&serviceName=${encodeURIComponent(serviceToDelete?.name || 'Service')}`);
-    } catch (error) {
-      console.error('Error deleting service:', error);
-      return { error: "Failed to delete service. Please try again." };
-    }
-  }
-  
-  return null;
-}
-
 export default function ProviderDashboard() {
-  const loaderData = useLoaderData<typeof loader>();
-  console.log('=== COMPONENT RECEIVED LOADER DATA ===');
-  console.log('Full loader data:', loaderData);
-  console.log('Loader data items:', loaderData.items);
-  console.log('Loader data items length:', loaderData.items?.length);
-  
-  const { items: initialItems } = loaderData;
   const [searchParams, setSearchParams] = useSearchParams();
-  const [items, setItems] = useState<Item[]>(initialItems);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [username, setUsername] = useState<string>('provider');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<'success' | 'delete'>('success');
 
-  // Debug logging for state
+  // Load services data on component mount
   useEffect(() => {
-    console.log('=== COMPONENT STATE DEBUG ===');
-    console.log('initialItems from loader:', initialItems?.length, initialItems?.map(i => i.name));
-    console.log('items state:', items.length, items.map(i => i.name));
-  }, [initialItems, items]);
+    async function loadData() {
+      try {
+        const services = await loadServicesData();
+        setItems(services);
+      } catch (error) {
+        console.error('Error loading services:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadData();
+  }, []);
 
   // Generate reports data
   const generateReports = () => {
@@ -405,6 +355,18 @@ export default function ProviderDashboard() {
   const handleCancelEdit = () => {
     setEditingItem(null);
   };
+
+  // Show loading while data is being fetched
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading while checking authentication
   if (!isAuthenticated) {

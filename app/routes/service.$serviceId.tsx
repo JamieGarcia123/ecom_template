@@ -1,76 +1,107 @@
 import { useState, useEffect } from "react";
-import { useLoaderData, Link } from "react-router";
+import { useParams, Link } from "react-router";
 import type { Item } from "../components/ItemCard";
 
 // Simple function to load service data directly
 async function loadServiceData(id: number): Promise<Item | null> {
   try {
-    // For server-side rendering, we need to read the file directly
-    if (typeof window === 'undefined') {
-      // Server-side: read from file system
-      const fs = await import('fs');
-      const path = await import('path');
-      
-      const filePath = path.join(process.cwd(), 'public', 'data', 'services.json');
-      const fileContent = fs.readFileSync(filePath, 'utf-8');
-      const services = JSON.parse(fileContent);
-      
-      const service = services.find((s: any) => s.id === id && s.active !== false);
-      return service || null;
-    } else {
-      // Client-side: fetch from URL
-      const response = await fetch('/data/services.json');
-      if (!response.ok) {
-        console.error('Failed to fetch services.json:', response.status);
-        return null;
-      }
-      
-      const services = await response.json();
-      const service = services.find((s: any) => s.id === id && s.active !== false);
-      return service || null;
+    // Use fetch for browser compatibility (SPA mode)
+    const response = await fetch('/ecom_template/data/services.json');
+    if (!response.ok) {
+      console.error('Failed to fetch services.json:', response.status);
+      return null;
     }
+    
+    const services = await response.json();
+    const service = services.find((s: any) => s.id === id && s.active !== false);
+    return service || null;
   } catch (error) {
     console.error('Error loading service data:', error);
     return null;
   }
 }
 
-// Loader function to get service data
-export async function loader({ params }: { params: { serviceId: string } }) {
-  try {
-    const serviceId = parseInt(params.serviceId);
-    console.log('Loading service with ID:', serviceId);
-    
-    const service = await loadServiceData(serviceId);
-    console.log('Service found:', service);
-    
-    if (!service) {
-      console.log('Service not found for ID:', serviceId);
-      throw new Response("Service not found", { status: 404 });
-    }
-    
-    return { service };
-  } catch (error) {
-    console.error('Error in service loader:', error);
-    throw new Response("Service not found", { status: 404 });
-  }
-}
-
 export default function ServiceDetails() {
-  const { service } = useLoaderData<typeof loader>();
+  const { serviceId } = useParams();
+  const [service, setService] = useState<Item | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
 
+  // Load service data on component mount
+  useEffect(() => {
+    async function loadData() {
+      if (!serviceId) {
+        setError('Service ID not found');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const serviceIdNum = parseInt(serviceId);
+        console.log('Loading service with ID:', serviceIdNum);
+        
+        const serviceData = await loadServiceData(serviceIdNum);
+        console.log('Service found:', serviceData);
+        
+        if (!serviceData) {
+          setError('Service not found');
+        } else {
+          setService(serviceData);
+        }
+      } catch (error) {
+        console.error('Error loading service:', error);
+        setError('Failed to load service');
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadData();
+  }, [serviceId]);
+
   // Check if service is favorited
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (service && typeof window !== 'undefined') {
       const favorites = localStorage.getItem('serviceFavorites');
       if (favorites) {
         const favList = JSON.parse(favorites);
         setIsFavorite(favList.includes(service.id));
       }
     }
-  }, [service.id]);
+  }, [service]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading service details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !service) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Service Not Found</h1>
+          <p className="text-gray-600 mb-6">{error || 'The service you are looking for does not exist.'}</p>
+          <Link
+            to="/services"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+          >
+            ← Back to Services
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   // Handle favorite toggle
   const handleToggleFavorite = () => {
