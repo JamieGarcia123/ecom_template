@@ -5,8 +5,11 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
-    base: '/ecom_template/', // 👈 must match the repo name
-
+  base: '/ecom_template/', // 👈 must match the repo name
+  build: {
+    outDir: 'build/client',
+    emptyOutDir: true,
+  },
 });
 
 
